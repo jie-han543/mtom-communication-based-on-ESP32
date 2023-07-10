@@ -170,6 +170,7 @@ SELECT * FROM `temp` ORDER BY `time` ASC LIMIT 0, 20;
  ![image](https://github.com/jie-han543/mtom-communication-based-on-ESP32/assets/57163528/50ff73e2-48a4-4494-89f1-b59ff6c5f243)
 
 图6-9 服务器运行结果
+
  ![image](https://github.com/jie-han543/mtom-communication-based-on-ESP32/assets/57163528/f69e3a35-010e-46a5-9f7e-e727cacc2956)
 
 (a) 温度低于25摄氏度时LED灭
