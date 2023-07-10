@@ -1,6 +1,7 @@
 # PC1 (debian 11)
 # 作为 MQTT 订阅者订阅消息，接收esp32发表的数据
 # 作为 Websocket 服务器，收到数据后转发给 PC2
+
 import random
 import asyncio
 import websockets
