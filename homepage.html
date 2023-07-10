@@ -1,0 +1,164 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="description" content="使用websocket的浏览器客户端，支持远程传感器的温度实时显示和数据回放">
+    <meta name="author" content="Han Jie, Cheng Siyi, Feng Xindan">
+    <title>温度实时显示器</title>
+    <script type="text/javascript">
+        // 第几次点击获取更多历史消息
+        var click = 0;
+        var ip = "ws://192.168.13.64";
+
+        /* 将摄氏温度转化为华氏温度 */
+        function CtoF(temp){
+            return temp*9/5+32;
+        }
+
+        /* Websocket 实时显示 */
+        function WebSocketTest() {
+            if ("WebSocket" in window) {
+                // 打开一个 websocket
+                var ws = new WebSocket(ip + ":8765");
+                // 第一次收到实时消息的标志
+                var flag = 0;
+                // 需要更新的 html 元素
+                var now_data = document.getElementById('NowTempData');
+                var msg = document.getElementById('CommState');
+
+                // 连接建立后的回调函数
+                ws.onopen = function () {
+                    ws.send("hello"); // 向服务器问好
+                    msg.innerHTML = msg.innerHTML + '<p> =>' + 'Hello server!' + '</p>';
+                };
+
+                // 接收到服务器消息后的回调函数
+                ws.onmessage = function (evt) {
+                    var received_msg = JSON.parse(evt.data);
+                    if (received_msg.state != 'OK') {
+                        alert("连接异常");
+                    } else {
+                        // 显示与服务器通讯状态
+                        if(received_msg.type == 'hello'){
+                            msg.innerHTML = msg.innerHTML + '<p> <=' + received_msg.response + '</p>';
+                        }
+                        if(received_msg.type == 'sending'){
+                            ws.send("realtime"); // 请求实时数据
+                            msg.innerHTML = msg.innerHTML + '<p> =>' + 'waiting temperature data from esp32...' + '</p>';
+                        }
+                        // 显示服务器推送的数据
+                        if(received_msg.type == 'new_data'){
+                            if(flag == 0){
+                                msg.innerHTML = msg.innerHTML + '<p> <=' + 'sending temperature data from esp32...' + '</p>';
+                                flag = flag + 1;
+                            }
+                            now_data.innerHTML = now_data.innerHTML + '<tr> <td style="width: 160px; margin: 0 auto; text-align: center;">' + received_msg.response.time + '</td>' +
+                                                    '<td style="width: 160px; margin: 0 auto; text-align: center;">' + received_msg.response.temp + '</td>' +
+                                                    '<td style="width: 160px; margin: 0 auto; text-align: center;">' + CtoF(received_msg.response.temp) + '</td>' + '</tr>';
+                        }
+                    }
+                };
+                // 连接关闭后的回调函数
+                ws.onclose = function () {
+                    // 关闭 websocket
+                    msg.innerHTML = msg.innerHTML + '<p>' + 'The connection for realtime data is closed.' + '</p>';
+                    //alert("连接已关闭...");
+                };
+            } else {
+                // 浏览器不支持 WebSocket
+                alert("您的浏览器不支持 WebSocket!");
+            }
+        }
+
+        /* Websocket 历史数据显示 */
+        function WebSocketTest2() {
+            if ("WebSocket" in window) {
+                // 打开一个 websocket
+                var ws = new WebSocket(ip + ":8768");
+                // 需要更新的 html 元素
+                var old_data = document.getElementById('OldTempData');
+                var msg = document.getElementById('CommState');
+
+                // 连接建立后的回调函数
+                ws.onopen = function () {
+                    ws.send("hello");
+                    msg.innerHTML = msg.innerHTML + '<p> =>' + 'Hello server!' + '</p>';
+                };
+
+                // 接收到服务器消息后的回调函数
+                ws.onmessage = function (evt) {
+                    var received_msg = JSON.parse(evt.data);
+                    if (received_msg.state != 'OK') {
+                        alert("连接异常");
+                    } else {
+                        // 显示与服务器通讯状态
+                        if(received_msg.type == 'hello'){
+                            msg.innerHTML = msg.innerHTML + '<p> <=' + received_msg.response + '</p>';
+                        }
+                        if(received_msg.type == 'sending'){
+                            // 服务器连接其本地数据库
+                            ws.send("database:" + click*20);
+                            click = click + 1;
+                            msg.innerHTML = msg.innerHTML + '<p> =>' + 'waiting temperature data from database...' + '</p>';
+                            msg.innerHTML = msg.innerHTML + '<p> <=' + 'sending temperature data from database...' + '</p>';
+                        }
+                        // 显示数据库历史的数据
+                        if(received_msg.type == 'old_data'){
+                            old_data.innerHTML = old_data.innerHTML + '<tr> <td style="width: 160px; margin: 0 auto; text-align: center;">' + received_msg.response.time + '</td>' +
+                                                    '<td style="width: 160px; margin: 0 auto; text-align: center;">' + received_msg.response.temp + '</td>' +
+                                                    '<td style="width: 160px; margin: 0 auto; text-align: center;">' + CtoF(received_msg.response.temp) + '</td>' + '</tr>';
+                        }
+                        if(received_msg.type == 'empty'){
+                            alert("没有更多数据了！");
+                            ws.onclose();
+                        }
+                        if(received_msg.type == 'close'){
+                            ws.onclose();
+                        }
+                    }
+                };
+                // 连接关闭后的回调函数
+                ws.onclose = function () {
+                    // 关闭 websocket
+                    msg.innerHTML = msg.innerHTML + '<p>' + 'The connection for history data is closed.' + '</p>';
+                };
+            } else {
+                // 浏览器不支持 WebSocket
+                alert("您的浏览器不支持 WebSocket!");
+            }
+        }
+    </script>
+</head>
+<body onload="WebSocketTest(); WebSocketTest2();">
+<div id="main">
+    <div id="RealTimeConsole">
+        <div id="CurrTemp">
+            <h2>当前温度</h2>
+            <table id="NowTempData">
+                <tr>
+                    <th style="width: 160px;">时间</th>
+                    <th style="width: 160px;">摄氏度</th>
+                    <th style="width: 160px;">华氏度</th>
+                </tr>
+            </table>
+        </div>
+
+        <div id="CommState">
+            <h2>通讯状态</h2>
+        </div>
+
+    </div>
+    <div id="DataReplayer">
+        <h2>历史数据</h2>
+            <input type="button" value="获取更多历史数据" onclick='WebSocketTest2();'/> 
+            <table id="OldTempData">
+                <tr>
+                    <th style="width: 160px;">时间</th>
+                    <th style="width: 160px;">摄氏度</th>
+                    <th style="width: 160px;">华氏度</th>
+                </tr>
+            </table>
+    </div>
+</div>
+</body>
+</html>
